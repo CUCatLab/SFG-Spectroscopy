@@ -14,7 +14,7 @@ def np_open(sif_file):
         f = open(sif_file,'rb')
         tile, size, no_images, info = _open(f)
     # allocate np.array
-    data = np.ndarray((no_images, size[1], size[0]), dtype=np.float32)
+    data = np.ndarray((no_images, size[1], size[0]), dtype=float)
     for i, tile1 in enumerate(tile):
         f.seek(tile1[2])  # offset
         data[i] = np.fromfile(f, count=size[0]*size[1],dtype='<f').reshape(size[1],size[0])
@@ -37,7 +37,7 @@ def xr_open(sif_file):
     # coordinates
     coords = OrderedDict()
     # extract time stamps
-    time = np.ndarray(len(data), dtype=np.float)
+    time = np.ndarray(len(data), dtype=float)
     for f in range(len(data)):
         time[f] = info['timestamp_of_{0:d}'.format(f)] * 1.0e-6  # unit [s]
         del info['timestamp_of_{0:d}'.format(f)]

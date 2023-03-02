@@ -1,233 +1,26 @@
 import os
 from os import listdir
 from os.path import isfile, join
-from pathlib import Path
 import sys
 import numpy as np
 from pandas import DataFrame as df
 import matplotlib.pyplot as plt
-import plotly.express as px
-import plotly.graph_objects as go
 import cmath
-import igor.igorpy as igor
-import re
 import yaml
+import re
 from lmfit import model, Model
 from lmfit.models import GaussianModel, SkewedGaussianModel, VoigtModel, ConstantModel, LinearModel, QuadraticModel, PolynomialModel
+from pathlib import Path
+import plotly.express as px
+import plotly.graph_objects as go
 import ipywidgets as widgets
 from ipywidgets import Button, Layout
 from IPython.display import clear_output
 from multiprocessing import Pool
-from importlib import reload
-import struct
+from . import datatools as dt
 
-##### Plotly settings ######
 
-import plotly.graph_objects as go
-import plotly.io as pio
-pio.renderers.default = 'notebook+plotly_mimetype'
-pio.templates.default = 'simple_white'
-pio.templates[pio.templates.default].layout.update(dict(
-    title_y = 0.95,
-    title_x = 0.5,
-    title_xanchor = 'center',
-    title_yanchor = 'top',
-    legend_x = 0,
-    legend_y = 1,
-    legend_traceorder = "normal",
-    legend_bgcolor='rgba(0,0,0,0)',
-    margin=go.layout.Margin(
-        l=0, #left margin
-        r=0, #right margin
-        b=0, #bottom margin
-        t=50, #top margin
-        )
-))
-
-SmallPlotLayout = go.Layout(
-    margin=go.layout.Margin(
-        l=0, #left margin
-        r=0, #right margin
-        b=0, #bottom margin
-        t=0, #top margin
-        ),
-    width=300,
-    height=300,
-    hoverdistance=100, # Distance to show hover label of data point
-    spikedistance=1000, # Distance to show spike
-    xaxis=dict(
-        showspikes=True, # Show spike line for X-axis
-        spikethickness=2,
-        spikedash="dot",
-        spikecolor="#999999",
-        spikemode="across",
-        showgrid=False
-        ),
-    yaxis=dict(
-        showgrid=False
-        ),
-    legend=dict(
-        itemclick="toggleothers",
-        itemdoubleclick="toggle",
-        ),
-    )
-
-##### Folders #####
-
-Folders = {}
-Folders['Parameters'] = os.getcwd()+'/Parameters'
-Folders['Fits'] = os.getcwd()+'/Fits'
-Folders['Figures'] = os.getcwd()+'/Figures'
-
-##### SIF reader #####
-
-sys.path.append(os.getcwd() + '/sif_reader/')
-import sif_reader
-
-##### Data Tools #####
-
-class DataTools :
-    
-    def __init__(self) :
-        
-        pass
-    
-    def FileList(self,FolderPath,Filter) :
-        
-        os.makedirs(Folders['Parameters'], exist_ok=True)
-        FileList = [f for f in listdir(FolderPath) if isfile(join(FolderPath, f))]
-        for i in range(len(Filter)):
-            FileList = [k for k in FileList if Filter[i] in k]
-        for i in range(len(FileList)):
-            FileList[i] = FileList[i].replace('.yaml','')
-        
-        return FileList
-    
-    def Load_SFG(self,Parameters) :
-        
-        FolderPath = Parameters['FolderPath']
-        FileName = Parameters['FileName']
-
-        if FileName.endswith('.ibw') :
-            d = binarywave.load(FolderPath + '/' + FileName)
-            y = np.transpose(d['wave']['wData'])
-            Start = d['wave']['wave_header']['sfB']
-            Delta = d['wave']['wave_header']['sfA']
-            x = np.arange(Start[0],Start[0]+y.shape[1]*Delta[0]-Delta[0]/2,Delta[0])
-            z = np.arange(Start[1],Start[1]+y.shape[0]*Delta[1]-Delta[1]/2,Delta[1])
-            print('Igor binary data loaded')
-        elif FileName.endswith('.itx') :
-            y = np.loadtxt(FolderPath + '/' + FileName,comments =list(string.ascii_uppercase))
-            y = np.transpose(y)
-            with open(FolderPath + '/' + FileName) as f:
-                reader = csv.reader(f, delimiter="\t")
-                for row in reader:
-                    if 'SetScale/P' in row[0]:
-                        SetScale = row[0]
-            xScale = re.findall(r' x (.*?),"",', SetScale)
-            xScale = xScale[0].split(',')
-            zScale = re.findall(r' y (.*?),"",', SetScale)
-            zScale = zScale[0].split(',')
-            Start = [float(xScale[0]),float(zScale[0])]
-            Delta = [float(xScale[1]),float(zScale[1])]
-            x = np.arange(Start[0],Start[0]+y.shape[1]*Delta[0]-Delta[0]/2,Delta[0])
-            z = np.arange(Start[1],Start[1]+y.shape[0]*Delta[1]-Delta[1]/2,Delta[1])
-            print('Igor text data loaded')
-        elif FileName.endswith('.pxp') :
-            DataName = Parameters['DataName']
-            igor.ENCODING = 'UTF-8'
-            d = igor.load(FolderPath + '/' + FileName)
-            for i in range(len(d.children)) :
-                if 'data' in str(d[i]) and len(d[i].data) < 10000 :
-                    globals()[d[i].name] = np.array(d[i].data)
-                    if len(d[i].axis[0]) > 0 :
-                        Name = d[i].name+'_x'
-                        globals()[Name] = np.array([])
-                        for j in range(len(d[i].axis[0])) :
-                            globals()[Name] = np.append(globals()[Name], d[i].axis[0][-1] + d[i].axis[0][0] * j)
-                    if len(d[i].axis[1]) > 0 :
-                        globals()[d[i].name] = np.transpose(globals()[d[i].name])
-                        Name = d[i].name+'_y'
-                        globals()[Name] = np.array([])
-                        for j in range(len(d[i].axis[1])) :
-                            globals()[Name] = np.append(globals()[Name], d[i].axis[1][-1] + d[i].axis[1][0] * j)
-            x = eval(DataName+'_x')
-            y = eval(DataName)
-            z = eval(DataName+'_y')
-            z = np.round(z,decimals=1)
-
-        elif FileName.endswith('sif') :
-            FileData = sif_reader.xr_open(FolderPath + '/' + FileName)
-            y = FileData.values[:,0,:]
-            x = [i for i in range(len(np.transpose(y)))]
-            z = [i+1 for i in range(len(y))]
-            
-            try :
-                FileData.attrs['WavelengthCalibration0']
-                FileData.attrs['WavelengthCalibration1']
-                FileData.attrs['WavelengthCalibration2']
-                FileData.attrs['WavelengthCalibration3']
-            except :
-                print('Warning: Wavelength calibration not found')
-            else :
-                c0 = FileData.attrs['WavelengthCalibration0']
-                c1 = FileData.attrs['WavelengthCalibration1']
-                c2 = FileData.attrs['WavelengthCalibration2']
-                c3 = FileData.attrs['WavelengthCalibration3']
-                for i in x :
-                    x[i] = c0 + c1*i + c2*1**2 + c3*i**3
-                x = np.array(x)
-                x = 1e7 / x - 12500
-            
-            try :
-                Frame = Parameters['Heating']['Frame']
-                Temperature = Parameters['Heating']['Temperature']
-            except :
-                print('Warning: Temperature data not found')
-            else :
-                FitModel = QuadraticModel()
-                ModelParameters = FitModel.make_params()
-                FitResults = FitModel.fit(Temperature, ModelParameters,x=Frame)
-                idx = np.array(z)
-                z = FitResults.eval(x=idx)
-                z = np.round(z,1)
-        
-        Data = df(np.transpose(y),index=x,columns=z)
-            
-        return Data
-    
-    def RemoveEmptyDataSets(self,Data,Threshold) :
-        
-        Index = list()
-        for i in Data.columns :
-            if np.mean(Data[i]) < Threshold :
-                Index.append(i)
-        for i in Index :
-            del Data[i]
-        
-        return Data
-    
-    def TrimData(self,Data,Min,Max) :
-        
-        Mask = np.all([Data.index.values>Min,Data.index.values<Max],axis=0)
-        Data = Data[Mask]
-        
-        return Data
-    
-    def ReduceResolution(self,Data,Resolution=1) :
-        
-        Counter = 0
-        ReducedData = df()
-        for i in range(int(len(Data.columns.values)/Resolution)) :
-            Column = round(np.mean(Data.columns[Counter:Counter+Resolution]),1)
-            ReducedData[Column] = Data[Data.columns[Counter:Counter+Resolution]].mean(axis=1)
-            Counter = Counter + Resolution
-        
-        return ReducedData
-
-##### Fit Tools #####
-
-class FitTools :
+class fitTools :
     
     def __init__(self,Data,FitInfo,Name='') :
         
@@ -433,8 +226,6 @@ class FitTools :
             if kwarg == 'fit_x':
                 fit_x = kwargs[kwarg]
         
-        dt = DataTools()
-        
         Data = self.Data
         Name = self.Name
         FitModel = self.FitModel
@@ -442,7 +233,7 @@ class FitTools :
         FitInfo = self.FitInfo
         
         if 'xRange' in FitInfo :
-            Data = dt.TrimData(Data,FitInfo['xRange'][0],FitInfo['xRange'][1])
+            Data = dt.trimData(Data,FitInfo['xRange'][0],FitInfo['xRange'][1])
         x = Data.index.values
         try:
             fit_x
@@ -524,34 +315,34 @@ class FitTools :
             print(string)
             print(75*'_')
 
-##### SFG #####
-
-class SFG :
+class sfg :
     
-    def __init__(self,DataFolder='') :
+    def __init__(self) :
         
-        self.dt = DataTools()
-        self.Folders = Folders
-        self.Folders['Data'] = DataFolder
+        with open('parameters.yaml', 'r') as stream :
+            self.folders = yaml.safe_load(stream)['folders']
         
-    def LoadData(self, Folder, File) :
+    def LoadData(self, File) :
         
-        dt = self.dt
-        
-        with open(Folder+'/'+File, 'r') as stream:
+        with open(File, 'r') as stream :
             Info = yaml.safe_load(stream)
         
-        Info['FolderPath'] = self.Folders['Data']+'/'+Info['FolderPath']
-        Data = dt.Load_SFG(Info)
+        if 'FolderPath' not in Info :
+            print(File)
+            date = re.split(r'sfg|_',File)[1]
+            print('20'+date[0:2]+'.'+date[2:4]+'.'+date[4:6])
+            Info['FolderPath'] = self.folders['data']+'/'+'20'+date[0:2]+'/'+'20'+date[0:2]+'.'+date[2:4]+'.'+date[4:6]
+        
+        Data = dt.loadSFG(Info)
         Threshold = Info['Background']['Threshold']
-        Data = dt.RemoveEmptyDataSets(Data,Threshold)
+        Data = dt.removeEmptyDataSets(Data,Threshold)
         
         if 'Files' in Info['Background'] :
             xlist = list()
             ylist = list()
             for file in Info['Background']['Files'] :
                 print('Loading background file: '+Info['Background']['Files'][file]['FileName'])
-                TempData = dt.Load_SFG(Info['Background']['Files'][file])
+                TempData = dt.loadSFG(Info['Background']['Files'][file])
                 xlist.append(TempData.index.values)
                 ylist.append(np.transpose(TempData.values)[0])
             BackgroundFromFile = np.array((np.average(xlist,axis=0),np.average(ylist,axis=0)))
@@ -560,14 +351,12 @@ class SFG :
         DataName = Path(File)
         DataName = DataName.with_suffix('')
         
-        self.ParametersFile = [Folder,File]
+        self.ParametersFile = File
         self.Info = Info
         self.Data = Data
         self.DataName = DataName
     
     def FitData(self) :
-        
-        dt = self.dt
         
         Data = self.Data
         Info = self.Info
@@ -598,7 +387,7 @@ class SFG :
         Background = df(Data[DataNames].mean(axis=1),columns=['Data'])
         
         Resolution = Info['Resolution']
-        Data = dt.ReduceResolution(Data,Resolution)
+        Data = dt.reduceResolution(Data,Resolution)
         
         ##### Fit Data #####
         
@@ -608,13 +397,13 @@ class SFG :
             Data_BC = Data.divide(Background['Data'],axis=0)
         else :
             print('Fitting Background')
-            fit = FitTools(Background,Info['Background'],'Background')
+            fit = fitTools(Background,Info['Background'],'Background')
             fit.Fit()
             Background['Fit'] = fit.Fits['Data']
             Data_BC = Data.divide(Background['Fit'],axis=0)
         
         if 'xRange' in Info['Fit'] :
-            Data_BC = dt.TrimData(Data_BC,Info['Fit']['xRange'][0],Info['Fit']['xRange'][1])
+            Data_BC = dt.trimData(Data_BC,Info['Fit']['xRange'][0],Info['Fit']['xRange'][1])
         
         if 'zRange' in Info['Fit'] :
             T_mask = []
@@ -623,7 +412,7 @@ class SFG :
             T_mask = np.all(T_mask, axis=0)
             Data_BC = Data_BC.T[T_mask].T
         
-        fit = FitTools(Data_BC,Info['Fit'])
+        fit = fitTools(Data_BC,Info['Fit'])
         fit.Fit(fit_x=Data.index.values)
 
         Fits_BC = fit.Fits
@@ -775,10 +564,12 @@ class SFG :
         CopyParameters.on_click(CopyParameters_Clicked)
 
         def Save2File_Clicked(b) :
-            os.makedirs(Folders['Fits'], exist_ok=True)
-            FitsFile = Folders['Fits'] +'/' + DataName + '.hdf'
+            os.makedirs(self.folders['Fits'], exist_ok=True)
+            FitsFile = self.folders['Fits'] +'/' + DataName + '.hdf'
             Data.to_hdf(FitsFile,'Data')
             Fits.to_hdf(FitsFile,'Fits',mode='a')
+            Data_BC.to_hdf(FitsFile,'Data_BC',mode='a')
+            Fits_BC.to_hdf(FitsFile,'Fits_BC',mode='a')
             FitsParameters.to_hdf(FitsFile,'Fits_Parameters',mode='a')
             FitsAssignments.to_hdf(FitsFile,'Fits_Assignments',mode='a')
         Save2File = widgets.Button(description="Save to File")
@@ -788,13 +579,10 @@ class SFG :
     
     def UI(self) :
         
-        dt = self.dt
-        ParametersFolder = Folders['Parameters']
-        
         out = widgets.Output()
         
         self.ParametersFiles = widgets.Dropdown(
-            options=dt.FileList(ParametersFolder,['.yaml','SFG']),
+            options=dt.fileList(['.yaml','sfg']),
             description='Select File',
             layout=Layout(width='70%'),
             style = {'description_width': '150px'},
@@ -804,7 +592,7 @@ class SFG :
         def ShowData_Clicked(b) :
             with out :
                 clear_output(True)
-                self.LoadData(Folders['Parameters'],self.ParametersFiles.value+'.yaml')
+                self.LoadData(self.ParametersFiles.value+'.yaml')
                 plt.figure(figsize = [8,6])
                 x = self.Data.index.values
                 y = self.Data.columns.values
@@ -821,7 +609,7 @@ class SFG :
         def FitData_Clicked(b) :
             with out :
                 clear_output(True)
-                self.LoadData(Folders['Parameters'],self.ParametersFiles.value+'.yaml')
+                self.LoadData(self.ParametersFiles.value+'.yaml')
                 self.FitData()
         FitData = widgets.Button(description="Fit Data")
         FitData.on_click(FitData_Clicked)

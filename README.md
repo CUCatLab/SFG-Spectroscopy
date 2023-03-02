@@ -1,3 +1,3 @@
-# Sum-Frequency Generation (SFG) Spectroscopy
+# SFG Fitting
 
-These files are used to Analyze Sum-Frequency Generation (SFG) spectroscopy data.
+These files are used to Analyze SFG and TPD data.

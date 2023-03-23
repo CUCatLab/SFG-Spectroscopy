@@ -5,9 +5,13 @@ Description: 'Methanol decomposition on Pt(111)'
 Resolution: 1
 
 Background:
-  # zRange: [450,500]
+  zRange: [450,500]
   zRange: [25,30]
   Threshold: 500
+  Files: 
+    sfg230125_03:
+      FileName: 'sfg230125_03.sif'
+      # FolderPath: 'C:\Users\larue\Chapman University\LaRue CatLab - Data\2023\2023.01.25'
 
 Fit:
   xRange: [2200,3400]
@@ -20,15 +24,15 @@ Fit:
     Peak1: # CO stretch, bridge
       assignment: '$\sf CO$ $\omega_{\sf CO}^{b/h}$'
       amp: {value: 38, min: 0, vary: True}
-      phi: {value: 3.6, min: 3.2, max: 3.8, vary: True}
-      omega: {value: 2700, min: 3200, max: 1900, vary: True}
-      gamma: {value: 34, min: 16, max: 42, vary: True}
+      phi: {value: 1.6, min: 0, max: 6.28, vary: True}
+      omega: {value: 2823, min: 2700, max: 2900, vary: True}
+      gamma: {value: 16, min: 12, max: 42, vary: True}
     Peak2: # CO stretch, top
       assignment: '$\sf CO$ $\omega_{\sf CO}^{top}$'
       amp: {value: 20, min: 0, vary: True}
-      phi: {value: 4.5, min: 0, max: 6.3, vary: True}
-      omega: {value: 2800, min: 3200, vary: True}
-      gamma: {value: 28, min: 25, max: 50, vary: True}
+      phi: {value: 1, min: 0, max: 6.3, vary: True}
+      omega: {value: 2920, min: 2850, vary: True}
+      gamma: {value: 18, min: 12, max: 50, vary: True}
   Cases:
     LowT:
       zRange: [0,256]

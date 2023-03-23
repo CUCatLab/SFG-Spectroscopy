@@ -324,14 +324,15 @@ class sfg :
         
     def LoadData(self, File) :
         
+        def FolderPath(File) :
+            date = re.split(r'sfg|_',File)[1]
+            return self.folders['data']+'/'+'20'+date[0:2]+'/'+'20'+date[0:2]+'.'+date[2:4]+'.'+date[4:6]
+
         with open(File, 'r') as stream :
             Info = yaml.safe_load(stream)
         
         if 'FolderPath' not in Info :
-            print(File)
-            date = re.split(r'sfg|_',File)[1]
-            print('20'+date[0:2]+'.'+date[2:4]+'.'+date[4:6])
-            Info['FolderPath'] = self.folders['data']+'/'+'20'+date[0:2]+'/'+'20'+date[0:2]+'.'+date[2:4]+'.'+date[4:6]
+            Info['FolderPath'] = FolderPath(File)
         
         Data = dt.loadSFG(Info)
         Threshold = Info['Background']['Threshold']
@@ -342,6 +343,8 @@ class sfg :
             ylist = list()
             for file in Info['Background']['Files'] :
                 print('Loading background file: '+Info['Background']['Files'][file]['FileName'])
+                if 'FolderPath' not in Info['Background']['Files'][file] :
+                    Info['Background']['Files'][file]['FolderPath'] = FolderPath(Info['Background']['Files'][file]['FileName'])
                 TempData = dt.loadSFG(Info['Background']['Files'][file])
                 xlist.append(TempData.index.values)
                 ylist.append(np.transpose(TempData.values)[0])
@@ -390,7 +393,7 @@ class sfg :
         Data = dt.reduceResolution(Data,Resolution)
         
         ##### Fit Data #####
-        
+
         try :
             Info['Background']['Models']
         except :

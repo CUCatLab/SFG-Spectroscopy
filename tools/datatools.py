@@ -3,6 +3,7 @@ import numpy as np
 from pandas import DataFrame as df
 import re
 from . import sif_open as sif
+from lmfit.models import QuadraticModel
 
 
 def fileList(Filter='') :
@@ -107,9 +108,11 @@ def reduceResolution(Data,Resolution=1) :
     
     Counter = 0
     ReducedData = df()
-    for i in range(int(len(Data.columns.values)/Resolution)) :
-        Column = round(np.mean(Data.columns[Counter:Counter+Resolution]),1)
-        ReducedData[Column] = Data[Data.columns[Counter:Counter+Resolution]].mean(axis=1)
-        Counter = Counter + Resolution
-    
-    return ReducedData
+    if Resolution > 1 :
+        for i in range(int(len(Data.columns.values)/Resolution)) :
+            Column = round(np.mean(Data.columns[Counter:Counter+Resolution]),1)
+            ReducedData[Column] = Data[Data.columns[Counter:Counter+Resolution]].mean(axis=1)
+            Counter = Counter + Resolution
+        Data = ReducedData
+
+    return Data

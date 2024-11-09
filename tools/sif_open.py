@@ -1,6 +1,7 @@
 import numpy as np
 from collections import OrderedDict
 from ._sif_open import _open
+from ._sif_open2 import _open2
 from .utils import extract_calibration
 
 def np_open(sif_file):
@@ -11,8 +12,12 @@ def np_open(sif_file):
         f = sif_file
         tile, size, no_images, info = _open(f)
     except AttributeError:
-        f = open(sif_file,'rb')
-        tile, size, no_images, info = _open(f)
+        try:
+            f = open(sif_file,'rb')
+            tile, size, no_images, info = _open(f)
+        except ValueError:
+            f = open(sif_file,'rb')
+            tile, size, no_images, info = _open2(f)
     # allocate np.array
     data = np.ndarray((no_images, size[1], size[0]), dtype=float)
     for i, tile1 in enumerate(tile):

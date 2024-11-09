@@ -37,7 +37,7 @@ def _read_int(fp):
 def _read_float(fp):
     return float(_read_until(fp, ' '))
 
-def _open(fp):
+def _open2(fp):
     """
     A helper function to read SIF file.
 
@@ -147,37 +147,44 @@ def _open(fp):
         info['DetectorType'] = _to_string(fp.readline())
     info['DetectorDimensions'] = (_read_int(fp), _read_int(fp))
     info['OriginalFilename'] = _read_string(fp)
-
     # What is this?
     fp.read(2) # space newline
 
+
     # What is this?
     _read_int(fp) # 65538
-    info['user_text'] = _read_string(fp)
+    info['user_text'] = fp.readline()
     
-    fp.read(1) # newline
+    # What is this?
+    fp.readline()
+    fp.readline()
+    fp.readline()
+    fp.readline()
+    
+    fp.readline()#14
     _read_int(fp) # 65538
     fp.read(8) # 0x01 space 0x02 space 0x03 space 0x00 space
     info['ShutterTime'] = (_read_float(fp), _read_float(fp)) # ends in newline
+
     
-    # Read line 10
-    _read_int(fp) # 65536
-    _read_until(fp, ' ') # 1
-    _read_until(fp, ' ') # 1
-    info['GratingWavelength'] = _read_float(fp)
-    _read_until(fp, ' ') # 1
-    _read_until(fp, ' ') # 0
-    info['GratingLinesmm'] = _read_float(fp)
-    info['GratingID'] = _read_float(fp)
-    
-    # Skip line 11
-    
-    # Read line 12
+    fp.readline()#16
     fp.readline()
-    info['SifCalbVersion'] = int(_read_until(fp, ' ')) # 65539
-    # additional skip for this version
-    if info['SifCalbVersion'] == 65540:
-        fp.readline()
+    fp.readline()
+    fp.readline()
+    fp.readline()#20
+    fp.readline()
+    fp.readline()
+    fp.readline()
+    fp.readline()
+    fp.readline()#25
+    fp.readline()
+    fp.readline()
+    fp.readline()
+    fp.readline()
+    fp.readline()#30
+    fp.readline()
+    fp.readline()
+    fp.readline()
 
     # 4th-order polynomial coefficients
     info['Calibration_data'] = fp.readline()
@@ -193,12 +200,14 @@ def _open(fp):
 
     fp.readline() # 422 newline or 433 newline
 
-    fp.readline() # 13 newline
-    fp.readline() # 13 newline
+    fp.readline() # 26 newline
+    fp.readline() # 26 newline
+    fp.readline() # 1 newline
+    fp.readline() # 10 newline
 
-    info['FrameAxis'] = _read_string(fp)
-    info['DataType'] = _read_string(fp)
-    info['ImageAxis'] = _read_string(fp)
+    info['FrameAxis'] = _read_until(fp, '\n')
+    info['DataType'] = _read_until(fp, '\n')
+    info['ImageAxis'] = _read_string(fp, 12)
 
     _read_until(fp, ' ') # 65541
 
